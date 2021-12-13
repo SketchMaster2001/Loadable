@@ -11,7 +11,7 @@ import Foundation
 public protocol Loadable: Decodable {}
 
 public extension Loadable {
-    func load<T: Decodable>(_ type: T.Type, data: Data, endianess: Endianess) throws -> T {
+    public func load<T: Decodable>(_ type: T.Type, data: Data, endianess: Endianess) throws -> T {
         // File pointer to keep state
         var pointer = 0
         var dict: [String: Any] = [:]
