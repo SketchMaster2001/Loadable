@@ -11,7 +11,8 @@ import Foundation
 public protocol Loadable: Decodable {}
 
 public extension Loadable {
-    public func load<T: Decodable>(_ type: T.Type, data: Data, endianess: Endianess) throws -> T {
+    /// Loads data into a struct
+    func load<T: Decodable>(_ type: T.Type, data: Data, endianess: Endianess) throws -> T {
         // File pointer to keep state
         var pointer = 0
         var dict: [String: Any] = [:]
@@ -59,6 +60,51 @@ public extension Loadable {
         
         let jsonData = try JSONSerialization.data(withJSONObject: dict)
         return try JSONDecoder().decode(T.self, from: jsonData)
+    }
+    
+    /// Writes the values in the struct to Data
+    func writeToData() throws -> Data {
+        var dataArray: [uint8] = []
+        
+        let mirror = Mirror(reflecting: self)
+        
+        for child in mirror.children {
+            let type = getType(value: child.value)
+            
+            // Integers
+            if (type == "UInt8" || type == "Int8") {
+                dataArray.append(child.value as! UInt8)
+            }
+            else if (type == "UInt16" || type == "Int16") {
+                dataArray += withUnsafeBytes(of: child.value as! UInt16) { Array($0) }
+            }
+            else if (type == "UInt32" || type == "Int32") {
+                dataArray += withUnsafeBytes(of: child.value as! UInt32) { Array($0) }
+            }
+            else if (type == "UInt64" || type == "Int64") {
+                dataArray += withUnsafeBytes(of: child.value as! UInt64) { Array($0) }
+            }
+            
+            // Byte Array
+            // The array must be initalized for this to work as we need a size
+            else if (type == "Array<UInt8>" || type == "Array<Int8>") {
+                let object = child.value as AnyObject
+                let size = object.count ?? 0
+                
+                if size == 0 {
+                    throw Errors.emptyByteArray("The passed byte array has not be initialized with a size!")
+                }
+                
+                dataArray += child.value as! [uint8]
+
+            }
+            else {
+                // Everything else is incompatible and cannot be loaded into the struct.
+                throw Errors.incompatibleDataType("Data type \(type) does not conform to Loadable!")
+            }
+        }
+        
+        return Data(bytes: &dataArray, count: dataArray.count)
     }
     
     /// getType gets the data type for the specified value. It also strips the `Optional<T>` if the type is optional
